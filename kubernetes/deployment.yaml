@@ -2,25 +2,25 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vulnerable-app
+  name: api-service-app
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vulnerable-app
+      app: api-service-app
   template:
     metadata:
       labels:
-        app: vulnerable-app
+        app: api-service-app
     spec:
       containers:
-      - name: app
+      - name: api-container
         image: nginx:latest
         securityContext:
           privileged: true
           runAsUser: 0
         env:
         - name: AWS_SECRET_KEY
-          value: "abc123XUtnFEMI/K7MDENG/bPxRfiCYABDDEFGHIJ"
+          value: "xYz987UVWtSRQpOnMLkjIHGFEDCBA/aBcDeFgHiJ"
         - name: DB_PASSWORD
-          value: "MyS3cr3tP@ssw0rd!103"
+          value: "T3stP@ssw0rd!442"
