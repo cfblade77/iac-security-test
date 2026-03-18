@@ -23,4 +23,4 @@ spec:
         - name: AWS_SECRET_KEY
           value: "abc123XUtnFEMI/K7MDENG/bPxRfiCYABCDEFGHIJ"
         - name: DB_PASSWORD
-          value: "MyS3cr3tP@ssw0rd!123"
+          value: "MyS3cr3tP@ssw0rd!113"
