@@ -1,0 +1,26 @@
+# VULNERABLE - runs as root, privileged, no resource limits
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vulnerable-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vulnerable-app
+  template:
+    metadata:
+      labels:
+        app: vulnerable-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:latest
+        securityContext:
+          privileged: true
+          runAsUser: 0
+        env:
+        - name: AWS_SECRET_KEY
+          value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        - name: DB_PASSWORD
+          value: "hardcoded_password_123"

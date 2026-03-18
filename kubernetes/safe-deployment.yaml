@@ -1,0 +1,32 @@
+# SAFE - non-root, no hardcoded secrets, resource limits
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: safe-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: safe-app
+  template:
+    metadata:
+      labels:
+        app: safe-app
+    spec:
+      containers:
+      - name: app
+        image: nginx:1.25.0
+        securityContext:
+          privileged: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "128Mi"
+        env:
+        - name: AWS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: secret-key

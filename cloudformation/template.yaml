@@ -1,0 +1,19 @@
+# VULNERABLE - unencrypted, public access
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  VulnerableBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: vulnerable-cf-bucket
+      AccessControl: PublicRead
+
+  VulnerableRDSInstance:
+    Type: AWS::RDS::DBInstance
+    Properties:
+      DBInstanceIdentifier: vulnerable-db
+      DBInstanceClass: db.t3.micro
+      Engine: mysql
+      MasterUsername: admin
+      MasterUserPassword: plaintext_password_123
+      PubliclyAccessible: true
+      StorageEncrypted: false
