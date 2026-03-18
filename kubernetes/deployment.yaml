@@ -21,6 +21,6 @@ spec:
           runAsUser: 0
         env:
         - name: AWS_SECRET_KEY
-          value: "abc123XUtnFEMI/K7MDENG/bPxRfiCYABCDEFGHIJ"
+          value: "abc123XUtnFEMI/K7MDENG/bPxRfiCYABDDEFGHIJ"
         - name: DB_PASSWORD
-          value: "MyS3cr3tP@ssw0rd!123"
+          value: "MyS3cr3tP@ssw0rd!103"
