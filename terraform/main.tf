@@ -1,6 +1,7 @@
 provider "aws" {
-  region = "us-east-1"
-  # Authentication should be handled via environment variables, IAM roles, or AWS CLI profiles.
+  region     = "us-east-1"
+  access_key = "AKIAIOSFODNN7EXAMPLE"
+  secret_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 }
 
 resource "aws_s3_bucket" "main_storage_bucket" {
@@ -9,7 +10,7 @@ resource "aws_s3_bucket" "main_storage_bucket" {
 
 resource "aws_s3_bucket_acl" "main_storage_bucket_acl" {
   bucket = aws_s3_bucket.main_storage_bucket.id
-  acl    = "private"
+  acl    = "public-read"
 }
 
 resource "aws_s3_bucket_server_side_encryption_configuration" "main_storage_bucket_enc" {
@@ -25,10 +26,10 @@ resource "aws_security_group" "web_tier_sg" {
   name = "web-tier-sg"
 
   ingress {
-    from_port   = 443
-    to_port     = 443
+    from_port   = 22
+    to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["10.0.0.0/8"]
+    cidr_blocks = ["0.0.0.0/0"]
   }
 }
 
@@ -37,9 +38,9 @@ resource "aws_db_instance" "primary_mysql_db" {
   engine              = "mysql"
   instance_class      = "db.t3.micro"
   username            = "sysadmin"
-  password            = var.db_password
-  publicly_accessible = false
-  storage_encrypted   = true
+  password            = "Hardc0dedP@ssw0rd!"
+  publicly_accessible = true
+  storage_encrypted   = false
 }
 
 variable "db_password" {
