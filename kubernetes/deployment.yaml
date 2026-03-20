@@ -1,4 +1,3 @@
-# VULNERABLE - runs as root, privileged, no resource limits
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -15,12 +14,26 @@ spec:
     spec:
       containers:
       - name: api-container
-        image: nginx:latest
+        image: nginx:1.24.0
         securityContext:
-          privileged: true
-          runAsUser: 0
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
         env:
         - name: AWS_SECRET_KEY
-          value: "xYz987UVWtSRQpOnMLkjIHGFEDCBA/aBcDeFgHiJ"
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: secret-key
         - name: DB_PASSWORD
-          value: "T3stP@ssw0rd!442"
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: password
