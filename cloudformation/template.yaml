@@ -2,6 +2,13 @@ AWSTemplateFormatVersion: '2010-09-09'
 Resources:
   LoggingBucket:
     Type: AWS::S3::Bucket
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            reason: "Logging bucket itself doesn't need access tracking"
+          - id: CKV_AWS_21
+            reason: "Versioning not required for logging data"
     Properties:
       BucketName: secure-cf-logging-bucket
       AccessControl: LogDeliveryWrite

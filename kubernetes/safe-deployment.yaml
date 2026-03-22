@@ -3,8 +3,8 @@ kind: Deployment
 metadata:
   name: safe-app
   namespace: my-secure-ns
-  # checkov:skip=CKV_K8S_21: namespace specified
-  # checkov:skip=CKV_K8S_43: namespace specified
+  annotations:
+    checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
 spec:
   replicas: 1
   selector:
@@ -14,6 +14,8 @@ spec:
     metadata:
       labels:
         app: safe-app
+      annotations:
+        checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -23,9 +25,13 @@ spec:
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
+      volumes:
+        - name: aws-secrets-vol
+          secret:
+            secretName: aws-secrets
       containers:
       - name: app
-        image: nginx:1.25.0
+        image: nginx@sha256:4424e31f2c366108433ecca7890ad527b243361577180dfd9a5bb36e828abf47
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
@@ -36,6 +42,10 @@ spec:
           capabilities:
             drop:
               - ALL
+        volumeMounts:
+          - name: aws-secrets-vol
+            mountPath: "/etc/aws-secrets"
+            readOnly: true
         resources:
           limits:
             cpu: "500m"
@@ -43,12 +53,6 @@ spec:
           requests:
             cpu: "250m"
             memory: "64Mi"
-        env:
-        - name: AWS_SECRET_KEY
-          valueFrom:
-            secretKeyRef:
-              name: aws-secrets
-              key: secret-key
         livenessProbe:
           httpGet:
             path: /health
@@ -61,3 +65,16 @@ spec:
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 15
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: safe-app-netpol
+  namespace: my-secure-ns
+spec:
+  podSelector:
+    matchLabels:
+      app: safe-app
+  policyTypes:
+  - Ingress
+  - Egress

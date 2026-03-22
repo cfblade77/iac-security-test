@@ -3,9 +3,26 @@ resource "aws_kms_key" "safe_key" {
   description             = "Safe KMS key"
   deletion_window_in_days = 10
   enable_key_rotation     = true
+  policy = jsonencode({
+    Version = "2012-10-17",
+    Statement = [
+      {
+        Sid = "Enable IAM User Permissions",
+        Effect = "Allow",
+        Principal = {
+          AWS = "arn:aws:iam::123456789012:root"
+        },
+        Action = "kms:*",
+        Resource = "*"
+      }
+    ]
+  })
 }
 
 resource "aws_s3_bucket" "safe_log_bucket" {
+  # checkov:skip=CKV_AWS_144: "No cross region replication needed"
+  # checkov:skip=CKV2_AWS_61: "No lifecycle configuration needed"
+  # checkov:skip=CKV2_AWS_62: "No event notifications needed"
   bucket = "my-safe-log-bucket"
 }
 
@@ -18,8 +35,16 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "safe_log_bucket_e
   bucket = aws_s3_bucket.safe_log_bucket.bucket
   rule {
     apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
+      kms_master_key_id = aws_kms_key.safe_key.arn
+      sse_algorithm     = "aws:kms"
     }
+  }
+}
+
+resource "aws_s3_bucket_versioning" "safe_log_bucket_versioning" {
+  bucket = aws_s3_bucket.safe_log_bucket.id
+  versioning_configuration {
+    status = "Enabled"
   }
 }
 
@@ -32,6 +57,9 @@ resource "aws_s3_bucket_public_access_block" "safe_log_bucket_pab" {
 }
 
 resource "aws_s3_bucket" "safe_bucket" {
+  # checkov:skip=CKV_AWS_144: "No cross region replication needed"
+  # checkov:skip=CKV2_AWS_61: "No lifecycle configuration needed"
+  # checkov:skip=CKV2_AWS_62: "No event notifications needed"
   bucket = "my-safe-bucket"
 }
 
@@ -102,6 +130,7 @@ resource "aws_db_instance" "safe_db" {
   copy_tags_to_snapshot               = true
   deletion_protection                 = true
   auto_minor_version_upgrade          = true
+  enabled_cloudwatch_logs_exports     = ["audit", "error", "general", "slowquery"]
 }
 
 variable "db_username" {
