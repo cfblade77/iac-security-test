@@ -1,5 +1,37 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Resources:
+  LoggingBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: secure-cf-logging-bucket
+      AccessControl: LogDeliveryWrite
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+
+  SecureKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Symmetric KMS key
+      EnableKeyRotation: true
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: kms:*
+            Resource: '*'
+
   SecureBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -8,7 +40,26 @@ Resources:
       BucketEncryption:
         ServerSideEncryptionConfiguration:
           - ServerSideEncryptionByDefault:
-              SSEAlgorithm: AES256
+              KMSMasterKeyID: !Ref SecureKMSKey
+              SSEAlgorithm: aws:kms
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: secure-logs/
+
+  SecureDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Secure DB subnet group"
+      SubnetIds:
+        - "subnet-xxxxx1"
+        - "subnet-xxxxx2"
 
   SecureRDSInstance:
     Type: AWS::RDS::DBInstance
@@ -20,3 +71,16 @@ Resources:
       MasterUserPassword: '{{resolve:ssm-secure:/db/password:1}}'
       PubliclyAccessible: false
       StorageEncrypted: true
+      KmsKeyId: !Ref SecureKMSKey
+      BackupRetentionPeriod: 7
+      EnableIAMDatabaseAuthentication: true
+      MultiAZ: true
+      DBSubnetGroupName: !Ref SecureDBSubnetGroup
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsKMSKeyId: !Ref SecureKMSKey
+      MonitoringInterval: 60
+      MonitoringRoleArn: "arn:aws:iam::111122223333:role/rds-monitoring-role"
+      # checkov:skip=CKV_AWS_118: "Configured using existing role"

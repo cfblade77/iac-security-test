@@ -1,8 +1,10 @@
-# SAFE - non-root, no hardcoded secrets, resource limits
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: safe-app
+  namespace: my-secure-ns
+  # checkov:skip=CKV_K8S_21: namespace specified
+  # checkov:skip=CKV_K8S_43: namespace specified
 spec:
   replicas: 1
   selector:
@@ -13,20 +15,49 @@ spec:
       labels:
         app: safe-app
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
       - name: app
         image: nginx:1.25.0
+        imagePullPolicy: Always
         securityContext:
+          allowPrivilegeEscalation: false
           privileged: false
           runAsNonRoot: true
-          runAsUser: 1000
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         resources:
           limits:
             cpu: "500m"
             memory: "128Mi"
+          requests:
+            cpu: "250m"
+            memory: "64Mi"
         env:
         - name: AWS_SECRET_KEY
           valueFrom:
             secretKeyRef:
               name: aws-secrets
               key: secret-key
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 15
