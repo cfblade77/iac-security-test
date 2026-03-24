@@ -1,26 +1,66 @@
-# VULNERABLE - runs as root, privileged, no resource limits
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vulnerable-app
+  name: api-service-app
+  namespace: default
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vulnerable-app
+      app: api-service-app
   template:
     metadata:
       labels:
-        app: vulnerable-app
+        app: api-service-app
     spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
       containers:
-      - name: app
-        image: nginx:latest
+      - name: api-container
+        image: nginx:1.24.0
+        imagePullPolicy: Always
         securityContext:
-          privileged: true
-          runAsUser: 0
+          allowPrivilegeEscalation: false
+          privileged: false
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
         env:
         - name: AWS_SECRET_KEY
-          value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: secret-key
         - name: DB_PASSWORD
-          value: "hardcoded_password_123"
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: password
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 15

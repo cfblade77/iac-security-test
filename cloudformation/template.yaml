@@ -1,19 +1,74 @@
-# VULNERABLE - unencrypted, public access
 AWSTemplateFormatVersion: '2010-09-09'
 Resources:
-  VulnerableBucket:
+  LoggingBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: vulnerable-cf-bucket
-      AccessControl: PublicRead
+      BucketName: secure-cf-logging-bucket
+      AccessControl: LogDeliveryWrite
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
-  VulnerableRDSInstance:
+  SecureKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Symmetric KMS key
+      EnableKeyRotation: true
+      PendingWindowInDays: 10
+
+  SecureBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: secure-cf-bucket
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref SecureKMSKey
+              SSEAlgorithm: aws:kms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: secure-logs/
+
+  SecureDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Secure DB subnet group"
+      SubnetIds:
+        - "subnet-xxxxx1"
+        - "subnet-xxxxx2"
+
+  SecureRDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBInstanceIdentifier: vulnerable-db
+      DBInstanceIdentifier: secure-db
       DBInstanceClass: db.t3.micro
       Engine: mysql
       MasterUsername: admin
-      MasterUserPassword: plaintext_password_123
-      PubliclyAccessible: true
-      StorageEncrypted: false
+      MasterUserPassword: '{{resolve:ssm-secure:/db/password:1}}'
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: !Ref SecureKMSKey
+      BackupRetentionPeriod: 7
+      EnableIAMDatabaseAuthentication: true
+      MultiAZ: true
+      DBSubnetGroupName: !Ref SecureDBSubnetGroup
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsKMSKeyId: !Ref SecureKMSKey
+      MonitoringInterval: 60
+      MonitoringRoleArn: "arn:aws:iam::111122223333:role/rds-monitoring-role"
+      # checkov:skip=CKV_AWS_118: "Configured using existing role"
