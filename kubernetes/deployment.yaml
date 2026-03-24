@@ -2,9 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: api-service-app
-  namespace: api-ns
-  annotations:
-    checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
+  namespace: default
 spec:
   replicas: 1
   selector:
@@ -14,8 +12,6 @@ spec:
     metadata:
       labels:
         app: api-service-app
-      annotations:
-        checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -25,16 +21,9 @@ spec:
         fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
-      volumes:
-        - name: aws-secrets-vol
-          secret:
-            secretName: aws-secrets
-        - name: db-secrets-vol
-          secret:
-            secretName: db-secrets
       containers:
       - name: api-container
-        image: nginx@sha256:7f7cea3d3e69f885a082daafbb3e185e49339aab8b71212879fbc50ac4ec291c
+        image: nginx:1.24.0
         imagePullPolicy: Always
         securityContext:
           allowPrivilegeEscalation: false
@@ -45,13 +34,17 @@ spec:
           capabilities:
             drop:
               - ALL
-        volumeMounts:
-          - name: aws-secrets-vol
-            mountPath: "/etc/aws-secrets"
-            readOnly: true
-          - name: db-secrets-vol
-            mountPath: "/etc/db-secrets"
-            readOnly: true
+        env:
+        - name: AWS_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: aws-secrets
+              key: secret-key
+        - name: DB_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: password
         resources:
           limits:
             cpu: "500m"
@@ -71,16 +64,3 @@ spec:
             port: 80
           initialDelaySeconds: 5
           periodSeconds: 15
----
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: api-service-netpol
-  namespace: api-ns
-spec:
-  podSelector:
-    matchLabels:
-      app: api-service-app
-  policyTypes:
-  - Ingress
-  - Egress

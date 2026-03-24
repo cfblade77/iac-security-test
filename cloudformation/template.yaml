@@ -2,13 +2,6 @@ AWSTemplateFormatVersion: '2010-09-09'
 Resources:
   LoggingBucket:
     Type: AWS::S3::Bucket
-    Metadata:
-      checkov:
-        skip:
-          - id: CKV_AWS_18
-            reason: "Logging bucket itself doesn't need access tracking"
-          - id: CKV_AWS_21
-            reason: "Versioning not required for logging data"
     Properties:
       BucketName: secure-cf-logging-bucket
       AccessControl: LogDeliveryWrite
@@ -28,16 +21,6 @@ Resources:
       Description: Symmetric KMS key
       EnableKeyRotation: true
       PendingWindowInDays: 10
-      KeyPolicy:
-        Version: '2012-10-17'
-        Id: key-default-1
-        Statement:
-          - Sid: Enable IAM User Permissions
-            Effect: Allow
-            Principal:
-              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
-            Action: kms:*
-            Resource: '*'
 
   SecureBucket:
     Type: AWS::S3::Bucket
@@ -49,8 +32,6 @@ Resources:
           - ServerSideEncryptionByDefault:
               KMSMasterKeyID: !Ref SecureKMSKey
               SSEAlgorithm: aws:kms
-      VersioningConfiguration:
-        Status: Enabled
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         BlockPublicPolicy: true
