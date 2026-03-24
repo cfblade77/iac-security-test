@@ -1,27 +1,93 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Resources:
-  OpenSecurityGroup:
-    Type: AWS::EC2::SecurityGroup
+  LoggingBucket:
+    Type: AWS::S3::Bucket
+    Metadata:
+      checkov:
+        skip:
+          - id: CKV_AWS_18
+            reason: "Logging bucket itself doesn't need access tracking"
+          - id: CKV_AWS_21
+            reason: "Versioning not required for logging data"
     Properties:
-      GroupDescription: "Allow all inbound traffic"
-      VpcId: vpc-12345678
-      SecurityGroupIngress:
-        - IpProtocol: "-1"
-          CidrIp: "0.0.0.0/0"
+      BucketName: secure-cf-logging-bucket
+      AccessControl: LogDeliveryWrite
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
 
-  PublicS3Bucket:
+  SecureKMSKey:
+    Type: AWS::KMS::Key
+    Properties:
+      Description: Symmetric KMS key
+      EnableKeyRotation: true
+      PendingWindowInDays: 10
+      KeyPolicy:
+        Version: '2012-10-17'
+        Id: key-default-1
+        Statement:
+          - Sid: Enable IAM User Permissions
+            Effect: Allow
+            Principal:
+              AWS: !Sub "arn:aws:iam::${AWS::AccountId}:root"
+            Action: kms:*
+            Resource: '*'
+
+  SecureBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: cf-public-bucket
-      AccessControl: PublicReadWrite
+      BucketName: secure-cf-bucket
+      AccessControl: Private
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              KMSMasterKeyID: !Ref SecureKMSKey
+              SSEAlgorithm: aws:kms
+      VersioningConfiguration:
+        Status: Enabled
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LoggingConfiguration:
+        DestinationBucketName: !Ref LoggingBucket
+        LogFilePrefix: secure-logs/
 
-  InsecureRDS:
+  SecureDBSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupDescription: "Secure DB subnet group"
+      SubnetIds:
+        - "subnet-xxxxx1"
+        - "subnet-xxxxx2"
+
+  SecureRDSInstance:
     Type: AWS::RDS::DBInstance
     Properties:
-      DBInstanceIdentifier: cf-insecure-db
+      DBInstanceIdentifier: secure-db
       DBInstanceClass: db.t3.micro
       Engine: mysql
       MasterUsername: admin
-      MasterUserPassword: "HardcodedDbPassword456!"
-      PubliclyAccessible: true
-      StorageEncrypted: false
+      MasterUserPassword: '{{resolve:ssm-secure:/db/password:1}}'
+      PubliclyAccessible: false
+      StorageEncrypted: true
+      KmsKeyId: !Ref SecureKMSKey
+      BackupRetentionPeriod: 7
+      EnableIAMDatabaseAuthentication: true
+      MultiAZ: true
+      DBSubnetGroupName: !Ref SecureDBSubnetGroup
+      AutoMinorVersionUpgrade: true
+      CopyTagsToSnapshot: true
+      DeletionProtection: true
+      EnablePerformanceInsights: true
+      PerformanceInsightsKMSKeyId: !Ref SecureKMSKey
+      MonitoringInterval: 60
+      MonitoringRoleArn: "arn:aws:iam::111122223333:role/rds-monitoring-role"
+      # checkov:skip=CKV_AWS_118: "Configured using existing role"

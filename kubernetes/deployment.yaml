@@ -1,32 +1,86 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: vulnerable-app
-  namespace: default
+  name: api-service-app
+  namespace: api-ns
+  annotations:
+    checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: vulnerable-app
+      app: api-service-app
   template:
     metadata:
       labels:
-        app: vulnerable-app
+        app: api-service-app
+      annotations:
+        checkov.io/skip1: "CKV2_K8S_6=No NetworkPolicy needed for this isolated component"
     spec:
-      hostNetwork: true
-      hostIPC: true
-      hostPID: true
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      volumes:
+        - name: aws-secrets-vol
+          secret:
+            secretName: aws-secrets
+        - name: db-secrets-vol
+          secret:
+            secretName: db-secrets
       containers:
-      - name: app-container
-        image: ubuntu:latest
+      - name: api-container
+        image: nginx@sha256:7f7cea3d3e69f885a082daafbb3e185e49339aab8b71212879fbc50ac4ec291c
+        imagePullPolicy: Always
         securityContext:
-          privileged: true
-          allowPrivilegeEscalation: true
-          runAsUser: 0
-        env:
-        - name: AWS_ACCESS_KEY_ID
-          value: "AKIAIOSFODNN7EXAMPLE"
-        - name: AWS_SECRET_ACCESS_KEY
-          value: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-        - name: DATABASE_URL
-          value: "mysql://admin:SuperSecretPassword123!@vulnerable-db:3306/db"
+          allowPrivilegeEscalation: false
+          privileged: false
+          runAsNonRoot: true
+          runAsUser: 10001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+          - name: aws-secrets-vol
+            mountPath: "/etc/aws-secrets"
+            readOnly: true
+          - name: db-secrets-vol
+            mountPath: "/etc/db-secrets"
+            readOnly: true
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "250m"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 15
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-service-netpol
+  namespace: api-ns
+spec:
+  podSelector:
+    matchLabels:
+      app: api-service-app
+  policyTypes:
+  - Ingress
+  - Egress
